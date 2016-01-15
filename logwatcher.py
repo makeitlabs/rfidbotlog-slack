@@ -22,8 +22,8 @@ class LogWatcher(object):
 
     Example:
 
-    >>> def callback(filename, lines):
-    ...     print(filename, lines)
+    >>> def callback(filename, lines, tailing):
+    ...     print(filename, lines, tailing)
     ...
     >>> lw = LogWatcher("/var/log/", callback)
     >>> lw.loop()
@@ -39,7 +39,7 @@ class LogWatcher(object):
         (callable) @callback:
             a function which is called every time one of the file being
             watched is updated;
-            this is called with "filename" and "lines" arguments.
+            this is called with "filename", "lines", and "tailing" arguments.
 
         (list) @extensions:
             only watch files with these extensions
@@ -70,7 +70,8 @@ class LogWatcher(object):
                         raise
                 else:
                     if lines:
-                        self._callback(file.name, lines)
+                        self._callback(file.name, lines, True)
+                        self._callback(file.name, None, True)
 
     def __enter__(self):
         return self
@@ -204,7 +205,7 @@ class LogWatcher(object):
             lines = file.readlines(self._sizehint)
             if not lines:
                 break
-            self._callback(file.name, lines)
+            self._callback(file.name, lines, False)
 
     def watch(self, fname):
         try:
@@ -226,7 +227,7 @@ class LogWatcher(object):
         with file:
             lines = self.readlines(file)
             if lines:
-                self._callback(file.name, lines)
+                self._callback(file.name, lines, False)
 
     @staticmethod
     def get_file_id(st):
@@ -263,7 +264,7 @@ if __name__ == '__main__':
     class TestLogWatcher(unittest.TestCase):
 
         def setUp(self):
-            def callback(filename, lines):
+            def callback(filename, lines, tailing):
                 self.filename.append(filename)
                 for line in lines:
                     self.lines.append(line)
