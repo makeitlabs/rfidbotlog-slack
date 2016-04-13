@@ -23,7 +23,7 @@ for tup in BotList:
 
 # -----------------------------------------------------------------
 
-tail_text = 'RFIDBot monitor online.  Most recent messages below:\n'
+tail_text = '%s monitor online.  Most recent messages below:\n' % (SlackUser)
 
 def sendMsg(timestamp, color, fallback, text):
     if timestamp == 'now':
@@ -52,61 +52,69 @@ def callback(filename, lines, tailing):
             # finished tailing
             
             # send a startup message
-            sendMsg('now', '#439FE0', 'RFIDBot monitor online', tail_text)
+            sendMsg('now', '#439FE0', '%s monitor online' % (SlackUser), tail_text)
             return
 
         for line in lines:
             # ['Jan', '13', '10:33:36', '10.0.0.50', ':', 'adam.shrey', 'allowed']
             # 2016-01-09 16:22:50,002 WARNING Unknown card 1234123 
-            fields = line.split()
+            
+            try:
+                fields = line.split()
+            
+                if DEBUG:
+                    print len(fields)
+                    print fields
+                
 
-            if DEBUG:
-                print fields
+                month = fields[0]
+                day = fields[1]
+                timehms = fields[2]
+                timeparsed = time.strptime(month + ' ' + day + ' ' + timehms, '%b %d %H:%M:%S')
+                timestamp = time.strftime('%B %d %H:%M:%S %Z', timeparsed)
 
-            month = fields[0]
-            day = fields[1]
-            timehms = fields[2]
-            timeparsed = time.strptime(month + ' ' + day + ' ' + timehms, '%b %d %H:%M:%S')
-            timestamp = time.strftime('%B %d %H:%M:%S %Z', timeparsed)
+                host = fields[3]
+                if host in BotDict:
+                    location = BotDict[host]
 
-            host = fields[3]
-            if host in BotDict:
-                location = BotDict[host]
+                    if (len(fields) > 6) and ((fields[6] == "allowed") or (fields[6] == "DENIED")):
+                        perm = fields[6]
+                        user = fields[5]
 
-                if ("allowed" in fields[6]) or ("DENIED" in fields[6]):
-                    perm = fields[6]
-                    user = fields[5]
+                        fallback_msg = timestamp + ' ' + user + ' ' + perm + ' at ' + location
+                        full_msg = '*' + user + '* ' + perm + ' at ' + location
 
-                    fallback_msg = timestamp + ' ' + user + ' ' + perm + ' at ' + location
-                    full_msg = '*' + user + '* ' + perm + ' at ' + location
+                        color = 'good'
+                        if "DENIED" in perm:
+                            color = 'warning'
 
-                    color = 'good'
-                    if "DENIED" in perm:
-                        color = 'warning'
+                        if tailing:
+                            tail_text += '> _' + timestamp + '_ '  + full_msg + '\n'
+                        else:
+                            sendMsg(timestamp, color, fallback_msg, full_msg)
 
-                    if tailing:
-                        tail_text += '> _' + timestamp + '_ '  + full_msg + '\n'
+                    elif "Unknown" in fields[5]:
+
+                        fallback_msg = timestamp + ' Unknown RFID key at ' + location
+                        full_msg = '*Unknown RFID key* at ' + location
+
+                        if tailing:
+                            tail_text += '> _' + timestamp + '_ ' + full_msg + '\n'
+                        else:
+                            sendMsg(timestamp, 'danger', fallback_msg, full_msg)
                     else:
-                        sendMsg(timestamp, color, fallback_msg, full_msg)
+                        fallback_msg = 'Unknown bot logging to syslog.'
+                        full_msg = '*Unknown bot* logging to syslog.'
 
-                elif "Unknown" in fields[5]:
-
-                    fallback_msg = timestamp + ' Unknown RFID key at ' + location
-                    full_msg = '*Unknown RFID key* at ' + location
-
-                    if tailing:
-                        tail_text += '> _' + timestamp + '_ ' + full_msg + '\n'
-                    else:
-                        sendMsg(timestamp, 'danger', fallback_msg, full_msg)
-            else:
-                fallback_msg = 'Unknown bot logging to syslog.'
-                full_msg = '*Unknown bot* logging to syslog.'
-
-                if tailing:
-                    tail_text += '> _' + timestamp + '_ ' + full_msg + '\n'
-                else:
-                    sendMsg(timestamp, 'warning', fallback_msg, full_msg)
-                    
+                        if tailing:
+                            tail_text += '> _' + timestamp + '_ ' + full_msg + '\n'
+                        else:
+                            sendMsg(timestamp, 'warning', fallback_msg, full_msg)
+                        
+            except:
+                if DEBUG:
+                    print "parse error:"
+                    print line
 
 
 # init slack
