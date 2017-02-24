@@ -102,14 +102,18 @@ def callback(filename, lines, tailing):
                             tail_text += '> _' + timestamp + '_ ' + full_msg + '\n'
                         else:
                             sendMsg(timestamp, 'danger', fallback_msg, full_msg)
+                
                     else:
-                        fallback_msg = 'Unknown bot logging to syslog.'
-                        full_msg = '*Unknown bot* logging to syslog.'
+                        # random messages that are not parseable
+                        pass
+                else:
+                    fallback_msg = 'Unknown bot logging to syslog.'
+                    full_msg = '*Unknown bot* logging to syslog.'
 
-                        if tailing:
-                            tail_text += '> _' + timestamp + '_ ' + full_msg + '\n'
-                        else:
-                            sendMsg(timestamp, 'warning', fallback_msg, full_msg)
+                    if tailing:
+                        tail_text += '> _' + timestamp + '_ ' + full_msg + '\n'
+                    else:
+                        sendMsg(timestamp, 'warning', fallback_msg, full_msg)
                         
             except:
                 if DEBUG:
