@@ -8,11 +8,11 @@ import io
 Config = ConfigParser.ConfigParser()
 Config.read('botlog.ini')
 LogDir = Config.get('General', 'LogDir')
-BotLogFile = Config.get('General', 'BotLogFile')
+BotLogFile = Config.get('AlarmBot', 'BotLogFile')
 
 SlackToken = Config.get('Slack', 'APIToken')
 SlackChannel = Config.get('Slack', 'Channel')
-SlackUser = Config.get('Slack', 'User')
+SlackUser = Config.get('AlarmBot', 'SlackUser')
 DEBUG = Config.getboolean('General', 'Debug')
 
 BotList = Config.items('Bots')
@@ -56,14 +56,15 @@ def callback(filename, lines, tailing):
             return
 
         for line in lines:
-            # ['Jan', '13', '10:33:36', '10.0.0.50', ':', 'bob.smith', 'allowed']
-            # 2016-01-09 16:22:50,002 WARNING Unknown card 1234123 
-
-            # Jan 28 20:28:32 10.0.0.53 : Tom.Doucet allowed
-            # Jan 28 20:33:26 10.0.0.50 : Tom.Doucet allowed
-            # Jan 28 20:23:59 10.0.0.53 : Doormode override GO AWAY for 60 minutes
-            # Jan 28 20:24:03 10.0.0.53 : Doormode override STOPPED
-
+            # Mar 16 12:33:54 alarmdecoder gunicorn[517]: --------------------------------------------------------------------------------
+            # Mar 16 12:33:54 alarmdecoder gunicorn[517]: DEBUG in types [/opt/alarmdecoder-webapp/ad2web/notifications/types.py:260]:
+            # Mar 16 12:33:54 alarmdecoder gunicorn[517]: Event: Zone <unnamed> (8) has been faulted.
+            # Mar 16 12:33:54 alarmdecoder gunicorn[517]: --------------------------------------------------------------------------------
+            # Mar 16 12:33:57 alarmdecoder gunicorn[517]: --------------------------------------------------------------------------------
+            # Mar 16 12:33:57 alarmdecoder gunicorn[517]: DEBUG in types [/opt/alarmdecoder-webapp/ad2web/notifications/types.py:260]:
+            # Mar 16 12:33:57 alarmdecoder gunicorn[517]: Event: Zone <unnamed> (8) has been restored.
+            # Mar 16 12:33:57 alarmdecoder gunicorn[517]: --------------------------------------------------------------------------------
+            # 0   1  2        3            4              5     ...
             try:
                 fields = line.split()
             
@@ -82,56 +83,23 @@ def callback(filename, lines, tailing):
                 if host in BotDict:
                     location = BotDict[host]
 
-                    if (len(fields) > 6) and ((fields[6] == "allowed") or (fields[6] == "DENIED")):
-                        perm = fields[6]
-                        user = fields[5]
+                    if (len(fields) >= 5) and (fields[5] == "Event:"):
+                        desc = ' '.join(fields[6:])
 
-                        fallback_msg = timestamp + ' ' + user + ' ' + perm + ' at ' + location
-                        full_msg = '*' + user + '* ' + perm + ' at ' + location
+                        fallback_msg = timestamp + ' ' + desc
+                        full_msg = '*' + desc + '*'
 
-                        color = 'good'
-                        if "DENIED" in perm:
+                        color = '#000000'
+                        if 'faulted' in desc:
                             color = 'warning'
+                        elif 'restored' in desc:
+                            color = 'good'
 
                         if tailing:
                             tail_text += '> _' + timestamp + '_ '  + full_msg + '\n'
                         else:
                             sendMsg(timestamp, color, fallback_msg, full_msg)
                             
-                    elif "Doormode" in fields[5]:
-                        mode = fields[7]
-                        if mode == "GO":
-                            mode = "UNAVAILABLE";
-                        elif mode == "STOPPED":
-                            mode = "AVAILABLE";
-
-                        fallback_msg = timestamp + ' ' + location + ' is now ' + mode
-                        full_msg = location + ' is now *' + mode + '*'
-
-
-                        color = 'good'
-
-                        if mode == "UNAVAILABLE":
-                            color = 'warning'
-                            full_msg = full_msg + ' :no_entry_sign:'
-                        elif mode == "AVAILABLE":
-                            full_msg = full_msg + ' :white_check_mark:'
-
-                        if tailing:
-                            tail_text += '> _' + timestamp + '_ '  + full_msg + '\n'
-                        else:
-                            sendMsg(timestamp, color, fallback_msg, full_msg)
-
-                    elif "Unknown" in fields[5]:
-
-                        fallback_msg = timestamp + ' Unknown RFID key at ' + location
-                        full_msg = '*Unknown RFID key* at ' + location
-
-                        if tailing:
-                            tail_text += '> _' + timestamp + '_ ' + full_msg + '\n'
-                        else:
-                            sendMsg(timestamp, 'danger', fallback_msg, full_msg)
-                
                     else:
                         # random messages that are not parseable
                         pass
