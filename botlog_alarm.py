@@ -11,8 +11,10 @@ LogDir = Config.get('General', 'LogDir')
 BotLogFile = Config.get('AlarmBot', 'BotLogFile')
 
 SlackToken = Config.get('Slack', 'APIToken')
-SlackChannel = Config.get('Slack', 'Channel')
+SlackSecurityChannel = Config.get('Slack', 'Channel')
 SlackUser = Config.get('AlarmBot', 'SlackUser')
+SlackAlarmChannel = Config.get('AlarmBot', 'SlackChannel')
+
 DEBUG = Config.getboolean('General', 'Debug')
 
 BotList = Config.items('Bots')
@@ -25,7 +27,7 @@ for tup in BotList:
 
 tail_text = '%s monitor online.  Most recent messages below:\n' % (SlackUser)
 
-def sendMsg(timestamp, color, fallback, text):
+def sendMsg(channel, timestamp, color, fallback, text):
     if timestamp == 'now':
         timestamp = time.strftime('%B %d %H:%M:%S %Z', time.localtime())
 
@@ -33,7 +35,7 @@ def sendMsg(timestamp, color, fallback, text):
     attachment_data = { 'fallback': fallback, 'color': color, 'text': text, 'mrkdwn_in':['text', 'pretext'] }
     attachments.append(attachment_data)
 
-    slack.chat.post_message(SlackChannel, '_' + timestamp + '_', username=SlackUser, attachments=json.dumps(attachments))
+    slack.chat.post_message(channel, '_' + timestamp + '_', username=SlackUser, attachments=json.dumps(attachments))
 
     if DEBUG:
         print fallback
@@ -52,7 +54,8 @@ def callback(filename, lines, tailing):
             # finished tailing
             
             # send a startup message
-            sendMsg('now', '#439FE0', '%s monitor online' % (SlackUser), tail_text)
+            sendMsg(SlackAlarmChannel, 'now', '#439FE0', '%s monitor online' % (SlackUser), tail_text)
+            sendMsg(SlackSecurityChannel, 'now', '#439FE0', '%s monitor online' % SlackUser, '%s monitor online' % SlackUser)
             return
 
         for line in lines:
@@ -98,7 +101,10 @@ def callback(filename, lines, tailing):
                         if tailing:
                             tail_text += '> _' + timestamp + '_ '  + full_msg + '\n'
                         else:
-                            sendMsg(timestamp, color, fallback_msg, full_msg)
+                            sendMsg(SlackAlarmChannel, timestamp, color, fallback_msg, full_msg)
+
+                        if 'has been armed' in desc or 'has been disarmed' in desc:
+                            sendMsg(SlackSecurityChannel, timestamp, color, fallback_msg, full_msg)
                             
                     else:
                         # random messages that are not parseable
@@ -110,7 +116,7 @@ def callback(filename, lines, tailing):
                     if tailing:
                         tail_text += '> _' + timestamp + '_ ' + full_msg + '\n'
                     else:
-                        sendMsg(timestamp, 'warning', fallback_msg, full_msg)
+                        sendMsg(SlackAlarmChannel, timestamp, 'warning', fallback_msg, full_msg)
                         
             except:
                 if DEBUG:
