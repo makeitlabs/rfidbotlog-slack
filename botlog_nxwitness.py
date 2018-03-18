@@ -10,8 +10,8 @@ Config.read('botlog.ini')
 LogDir = Config.get('General', 'LogDir')
 BotLogFile = Config.get('General', 'BotLogFile')
 
-Server = Config.get('WelcomeBot', 'Server')
-ServerPort = Config.get('WelcomeBot', 'ServerPort')
+Server = Config.get('NXWitnessBot', 'Server')
+ServerPort = Config.get('NXWitnessBot', 'ServerPort')
 
 DEBUG = Config.getboolean('General', 'Debug')
 
@@ -25,17 +25,24 @@ for tup in BotList:
 
 tail_text = 'RFIDBot monitor online.  Most recent messages below:\n'
 
-def sendMsg(timestamp, user,perm):
+def sendMsg(timestamp, user, perm, loc):
     '''Send an allowed or denied message'''
     if timestamp == 'now':
         timestamp = time.strftime('%B %d %H:%M:%S %Z', time.localtime())
 
     # Send Message
-    uri = 'http://' + Server + ':' + ServerPort + '/ping/'
-    msg = uri + user + '/' + perm
-    if DEBUG:
-        print(msg)
-    r = requests.get(msg)
+    uri = 'http://' + Server + ':' + ServerPort + '/api/createEvent'
+
+    #meta = json.dumps({u'cameraRefs': [u'd0e90705-b393-e40c-dcd6-d69e5be70b6c', u'4241f611-31ee-56f0-ad15-045c9ffe2fdf']})
+    cap = 'RFID: ' + user + ' ' + perm
+    desc = 'RFID @ ' + loc + ': ' + user + ' ' + perm + ' at ' + timestamp 
+
+    #uri = uri + '?source=RFIDBot ' + loc + '&caption=' + cap + '&description=' + desc + '&metadata=' + meta
+    uri = uri + '?source=RFIDBot ' + loc + '&caption=' + cap + '&description=' + desc
+    r = requests.get(uri, auth=('admin', 'MakeIt.2'))
+
+    print(r.url)
+    print (r.json())
 
 def callback(filename, lines, tailing):
     global tail_text
@@ -47,6 +54,7 @@ def callback(filename, lines, tailing):
         if tailing and (lines == None):
             # finished tailing
             
+
             # send a startup message
             #sendMsg('now', '#439FE0', 'RFIDBot monitor online', tail_text)
             return
@@ -83,7 +91,7 @@ def callback(filename, lines, tailing):
                         if tailing:
                             tail_text += '> _' + timestamp + '_ '  + full_msg + '\n'
                         else:
-                            sendMsg(timestamp, user, perm)
+                            sendMsg(timestamp, user, perm, location)
 
                     elif "Unknown" in fields[5]:
 
@@ -106,6 +114,7 @@ def callback(filename, lines, tailing):
                 if DEBUG:
                     print "parse error:"
                     print line
+
 
 
 
